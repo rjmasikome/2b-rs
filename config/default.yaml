@@ -1,0 +1,14 @@
+server:
+  port: 9090
+  host: "0.0.0.0"
+  health: "/admin/health"
+
+2b:
+  debug: true
+  jobs:
+    - name: "hello-world"
+      scripts: 
+        - "echo 'Hello World'"
+        - "echo 'Thanks for testing'"
+    - path: "/remote-world"
+      script-path: "./scripts/another-script.sh"
