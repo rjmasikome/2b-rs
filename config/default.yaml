@@ -10,5 +10,5 @@ server:
       scripts: 
         - "echo 'Hello World'"
         - "echo 'Thanks for testing'"
-    - path: "/remote-world"
-      script-path: "./scripts/another-script.sh"
+    - name: "remote-world"
+      path: "./scripts/another-script.sh"
