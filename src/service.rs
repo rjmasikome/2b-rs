@@ -3,6 +3,7 @@ use actix_web::{get, web, App, HttpRequest, HttpResponse, HttpServer};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::io::Error;
+use std::process::Command;
 use std::sync::{Arc, Mutex};
 
 pub struct Service {
@@ -20,7 +21,7 @@ pub struct JobConfigPath {
   path: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JobConfig {
   #[serde(skip_serializing_if = "Option::is_none")]
   name: Option<String>,
@@ -31,7 +32,6 @@ pub struct JobConfig {
 }
 
 impl JobConfig {
-  
   fn from_scripts(config: JobConfigScripts) -> JobConfig {
     JobConfig {
       name: Some(config.name),
@@ -50,40 +50,55 @@ impl JobConfig {
 }
 
 #[get("/jobs/{name}")]
-fn get_jobs(data: web::Data<Arc<Mutex<Value>>>, req: HttpRequest, name: web::Path<String>) -> HttpResponse {
-
-  let job_configs: Vec<JobConfig> = data
-    .lock().unwrap()["2b"]["jobs"]
+fn get_jobs(
+  data: web::Data<Arc<Mutex<Value>>>,
+  req: HttpRequest,
+  name: web::Path<String>,
+) -> HttpResponse {
+  let job_configs: Vec<JobConfig> = data.lock().unwrap()["2b"]["jobs"]
     .as_sequence()
     .expect("Wrong configs")
-    .iter().map (
-      |value| serde_yaml::from_value (value.clone()).unwrap()
-    )
-    .collect();
-
-  let matched_job: Vec<String> = job_configs
     .iter()
-    .map (
-      |value| value.name.clone().unwrap()
-    )
-    .filter (
-      |job_name| job_name.clone() == name.to_string()
-    )
+    .map(|value| serde_yaml::from_value(value.clone()).unwrap())
     .collect();
 
-  if matched_job.len() > 0 {
-    
-    println!("{:?}", matched_job[0]);
+  let matched_jobs: Vec<JobConfig> = job_configs
+    .iter()
+    .filter(|value| value.name.clone().unwrap() == name.to_string())
+    .cloned()
+    .collect();
+
+  if matched_jobs.len() > 0 {
+
     println!("REQ: {:?}", req);
+    let jobs_scripts = matched_jobs[0].clone().scripts;
+
+    if (jobs_scripts.is_some()) {
+
+      for script in jobs_scripts.unwrap() {
+
+        println!("{:?}", script);
+
+        let mut command_scripts = Command::new("sh")
+          .arg("-c")
+          .arg(script)
+          .output()
+          .expect("failed to execute process");
+
+        let s = String::from_utf8_lossy(&command_scripts.stdout);
+
+        println!("{}", s);
+      }
+    }
 
     return HttpResponse::Ok()
       .content_type("text/plain")
-      .body(format!("Hello: {}!\r\n", name))
-  } 
+      .body(format!("Hello: {}!\r\n", name));
+  }
 
   HttpResponse::InternalServerError()
-      .content_type("text/plain")
-      .body(format!("Job {} not found!\r\n", name))
+    .content_type("text/plain")
+    .body(format!("Job {} not found!\r\n", name))
 }
 
 #[get("/jobs/{name}/run")]
@@ -106,7 +121,6 @@ impl Service {
   }
 
   pub fn start(&self) -> std::io::Result<()> {
-
     let sys = actix_rt::System::new("pinger-rs");
     let shared_config = web::Data::new(Arc::new(Mutex::new(self.config.clone())));
 
