@@ -5,21 +5,22 @@ use serde_yaml::Value;
 use std::io::Error;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
+use std::thread;
 
 pub struct Service {
   config: Value,
 }
 
-#[derive(Debug)]
-pub struct JobConfigScripts {
-  name: String,
-  scripts: Vec<String>,
-}
+// #[derive(Debug)]
+// pub struct JobConfigScripts {
+//   name: String,
+//   scripts: Vec<String>,
+// }
 
-pub struct JobConfigPath {
-  name: String,
-  path: String,
-}
+// pub struct JobConfigPath {
+//   name: String,
+//   path: String,
+// }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JobConfig {
@@ -31,23 +32,23 @@ pub struct JobConfig {
   path: Option<String>,
 }
 
-impl JobConfig {
-  fn from_scripts(config: JobConfigScripts) -> JobConfig {
-    JobConfig {
-      name: Some(config.name),
-      scripts: Some(config.scripts),
-      path: None,
-    }
-  }
+// impl JobConfig {
+//   fn from_scripts(config: JobConfigScripts) -> JobConfig {
+//     JobConfig {
+//       name: Some(config.name),
+//       scripts: Some(config.scripts),
+//       path: None,
+//     }
+//   }
 
-  fn from_path(config: JobConfigPath) -> JobConfig {
-    JobConfig {
-      name: Some(config.name),
-      scripts: None,
-      path: Some(config.path),
-    }
-  }
-}
+//   fn from_path(config: JobConfigPath) -> JobConfig {
+//     JobConfig {
+//       name: Some(config.name),
+//       scripts: None,
+//       path: Some(config.path),
+//     }
+//   }
+// }
 
 #[get("/jobs/{name}")]
 fn get_jobs(
@@ -68,17 +69,20 @@ fn get_jobs(
     .cloned()
     .collect();
 
-  if matched_jobs.len() > 0 {
+  if matched_jobs.len() == 0 {
+    return HttpResponse::InternalServerError()
+      .content_type("text/plain")
+      .body(format!("Job {} not found!\r\n", name));
+  }
 
-    println!("REQ: {:?}", req);
-    let jobs_scripts = matched_jobs[0].clone().scripts;
+  println!("REQ: {:?}", req);
 
-    if (jobs_scripts.is_some()) {
+  let job_scripts = matched_jobs[0].clone().scripts;
+  let job_path = matched_jobs[0].clone().path;
 
-      for script in jobs_scripts.unwrap() {
-
-        println!("{:?}", script);
-
+  if (job_scripts.is_some()) {
+    thread::spawn(move || {
+      for script in job_scripts.unwrap() {
         let mut command_scripts = Command::new("sh")
           .arg("-c")
           .arg(script)
@@ -86,19 +90,21 @@ fn get_jobs(
           .expect("failed to execute process");
 
         let s = String::from_utf8_lossy(&command_scripts.stdout);
-
         println!("{}", s);
       }
-    }
-
-    return HttpResponse::Ok()
-      .content_type("text/plain")
-      .body(format!("Hello: {}!\r\n", name));
+    });
   }
 
-  HttpResponse::InternalServerError()
+  if (job_path.is_some()) {
+    Command::new("sh")
+      .arg(job_path.unwrap())
+      .spawn()
+      .expect("failed to execute process");
+  }
+
+  HttpResponse::Ok()
     .content_type("text/plain")
-    .body(format!("Job {} not found!\r\n", name))
+    .body(format!("Hello: {}!\r\n", name))
 }
 
 #[get("/jobs/{name}/run")]
