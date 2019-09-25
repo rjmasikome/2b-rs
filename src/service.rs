@@ -1,26 +1,21 @@
 use actix_rt;
-use actix_web::{get, web, App, HttpRequest, HttpResponse, HttpServer};
+use actix_web::{get, post, web, App, HttpRequest, HttpResponse, HttpServer};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::io::Error;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::collections::HashMap;
 
 pub struct Service {
-  config: Value,
+  config: Value
 }
 
-// #[derive(Debug)]
-// pub struct JobConfigScripts {
-//   name: String,
-//   scripts: Vec<String>,
-// }
-
-// pub struct JobConfigPath {
-//   name: String,
-//   path: String,
-// }
+struct SharedData {
+  config: Value,
+  running_state: HashMap<String, bool>,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JobConfig {
@@ -32,31 +27,15 @@ pub struct JobConfig {
   path: Option<String>,
 }
 
-// impl JobConfig {
-//   fn from_scripts(config: JobConfigScripts) -> JobConfig {
-//     JobConfig {
-//       name: Some(config.name),
-//       scripts: Some(config.scripts),
-//       path: None,
-//     }
-//   }
-
-//   fn from_path(config: JobConfigPath) -> JobConfig {
-//     JobConfig {
-//       name: Some(config.name),
-//       scripts: None,
-//       path: Some(config.path),
-//     }
-//   }
-// }
-
-#[get("/jobs/{name}")]
-fn get_jobs(
-  data: web::Data<Arc<Mutex<Value>>>,
+#[post("/jobs/{name}/run")]
+fn run_jobs(
+  data: web::Data<Arc<Mutex<SharedData>>>,
   req: HttpRequest,
   name: web::Path<String>,
 ) -> HttpResponse {
-  let job_configs: Vec<JobConfig> = data.lock().unwrap()["2b"]["jobs"]
+
+  let job_configs: Vec<JobConfig> = data.lock().unwrap()
+    .config["2b"]["jobs"]
     .as_sequence()
     .expect("Wrong configs")
     .iter()
@@ -79,6 +58,7 @@ fn get_jobs(
 
   let job_scripts = matched_jobs[0].clone().scripts;
   let job_path = matched_jobs[0].clone().path;
+  // let job_states: Vec<JobConfig> = data.lock().unwrap().running_state;
 
   if (job_scripts.is_some()) {
     thread::spawn(move || {
@@ -107,8 +87,9 @@ fn get_jobs(
     .body(format!("Hello: {}!\r\n", name))
 }
 
-#[get("/jobs/{name}/run")]
-fn run_jobs(req: HttpRequest, name: web::Path<String>) -> String {
+#[get("/jobs/{name}")]
+fn get_jobs(req: HttpRequest, name: web::Path<String>) -> String {
+
   println!("REQ: {:?}", req);
   format!("Hello: {}!\r\n", name)
 }
@@ -127,23 +108,22 @@ impl Service {
   }
 
   pub fn start(&self) -> std::io::Result<()> {
+
     let sys = actix_rt::System::new("pinger-rs");
-    let shared_config = web::Data::new(Arc::new(Mutex::new(self.config.clone())));
-
-    let host = self.config["server"]["host"]
-      .as_str()
-      .unwrap_or("127.0.0.1");
+    let host = self.config["server"]["host"].as_str().unwrap_or("127.0.0.1");
     let port = self.config["server"]["port"].as_u64().unwrap_or(8080);
-
-    let liveness_endpoint = self.config["server"]["health"]
-      .as_str()
-      .unwrap_or("/healthcheck");
-
+    let liveness_endpoint = self.config["server"]["health"].as_str().unwrap_or("/healthcheck");
     let liveness_endpoint_str = liveness_endpoint.to_string();
+
+    let shared_data = web::Data::new(Arc::new(Mutex::new(
+      SharedData {
+        config: self.config.clone(),
+        running_state: HashMap::new(),
+    })));
 
     HttpServer::new(move || {
       App::new()
-        .register_data(shared_config.clone())
+        .register_data(shared_data.clone())
         .service(get_jobs)
         .service(run_jobs)
         .service(web::resource(&liveness_endpoint_str).to(liveness_ep))
