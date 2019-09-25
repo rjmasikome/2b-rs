@@ -109,7 +109,7 @@ impl Service {
 
   pub fn start(&self) -> std::io::Result<()> {
 
-    let sys = actix_rt::System::new("pinger-rs");
+    let sys = actix_rt::System::new("2b-rs");
     let host = self.config["server"]["host"].as_str().unwrap_or("127.0.0.1");
     let port = self.config["server"]["port"].as_u64().unwrap_or(8080);
     let liveness_endpoint = self.config["server"]["health"].as_str().unwrap_or("/healthcheck");

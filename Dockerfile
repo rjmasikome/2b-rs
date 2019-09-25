@@ -22,9 +22,9 @@ FROM alpine
 
 WORKDIR /usr/src/app
 
-COPY --from=build /usr/src/app/target/x86_64-unknown-linux-musl/debug/pinger-rs .
+COPY --from=build /usr/src/app/target/x86_64-unknown-linux-musl/debug/2b-rs .
 COPY --from=build /usr/src/app/config.yml .
 
 EXPOSE 9090
 
-CMD ["./pinger-rs", "config.yml"]
+CMD ["./2b-rs", "config.yml"]

@@ -6,7 +6,7 @@ HTTP Remote Runner :gear:
 
 What it does is to retrieve an HTTP POST request, and based on the configuration, it will run the command on the remote machine.
 
-Named after the best android 2B
+Named after the best android 2B.
 
 ## Features
 - [x] Remote runner based on the `sh` file or array of strings

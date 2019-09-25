@@ -2,12 +2,12 @@ version: '2'
 
 services:
 
-  pinger-rs:
-    container_name: pinger-rs
+  2b-rs:
+    container_name: 2b-rs
     restart: always
     build:
       context: .
       dockerfile: Dockerfile
     ports:
       - 9091:9090
-    image: rjmasikome/pinger-rs
+    image: rjmasikome/2b-rs
