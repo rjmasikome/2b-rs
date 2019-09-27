@@ -5,6 +5,7 @@ server:
 
 2b:
   debug: true
+  log: "./logs"
   jobs:
     - name: "hello-world"
       scripts: 

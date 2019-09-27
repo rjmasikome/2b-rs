@@ -15,7 +15,7 @@ fn main() -> std::io::Result<()> {
   }
 
   let conf = config::get_config(filename_arg).expect("Failed to load YAML config.");
-  let service_obj = service::Service::new(conf.clone())?;
+  let service_obj = service::HTTPService::new(conf.clone())?;
 
   service_obj.start()
 }

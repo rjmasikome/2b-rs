@@ -13,11 +13,7 @@ fn read_file(filename: &str) -> Option<String> {
 
 pub fn parse_yaml(yaml: String) -> Option<Value> {
   let c_str: &str = &yaml;
-  let parsed = serde_yaml::from_str(c_str).unwrap();
-  match parsed {
-    Some(value) => Some(value),
-    None => None,
-  }
+  serde_yaml::from_str(c_str).unwrap()
 }
 
 pub mod config {
